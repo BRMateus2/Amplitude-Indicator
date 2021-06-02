@@ -21,9 +21,9 @@ You should have received a copy of the GNU General Public License along with thi
 #property copyright "2021, Mateus Matucuma Teixeira"
 #property link "https://github.com/BRMateus2/"
 #property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given period and can act as a substitute of the ATR indicator.\n"
-#property description "The indicator can be used to observe volatility and the force of the past swings, useful to determine excess movements that will possibly be reversed or repeated, given that the user has knowledge to complement with volume flux or standard-deviation strategies.\n"
+#property description "The indicator can be used to observe volatility and the force of past swings, useful to determine excess movements that will possibly be reversed or repeated, given that the user has knowledge to complement with volume flux or standard-deviation strategies.\n"
 #property description "It is suggested a period of 23 at 1H (meaning 1 session), for 24hs markets, or any period that complements your strategy."
-#property version "1.00"
+#property version "1.01"
 #property strict
 #property indicator_separate_window
 #property indicator_buffers 1
@@ -48,7 +48,7 @@ int a_period = 1; // Backup period if user inserts wrong value
 _INPUT bool a_ignore_gaps = false; // Ignore gaps between candles? (Not include last close?)
 //_INPUT bool a_use_percentage = true; // Show data as percentage points? TODO
 //---- "Adaptive Period"
-input group "Adaptive Period"
+input group "Adaptive Period (overrides Basic Period Settings)"
 _INPUT bool period_adaptive = true; // Adapt the Period to attempt to match a given higher setting?
 _INPUT int period_adaptive_minutes = 1380; // Period in minutes that all timeframes should adapt to?
 //---- Indicator Buffers
@@ -59,10 +59,10 @@ double a_buffer[] = {};
 int OnInit()
 {
 // User and Developer Input scrutiny
-    if(period_adaptive == true) { // Calculate a_period if period_adaptive == true
+    if(period_adaptive == true) { // Calculate a_period if period_adaptive == true. The problem with this simple method, is that D1, W1 and MN are all set wrong and the user should correct by himself. The only way to automatically correct this is by forcing a "double period_days = variable", counting how many bars there are in a single day and multiplying, resulting in a adaptive period factor.
         if(period_adaptive_minutes > 0) {
             a_period = ((period_adaptive_minutes * 60) / PeriodSeconds(PERIOD_CURRENT));
-            if(a_period == 0) {
+            if(a_period == 0) { // If the division is less than 1, then we have to complement to a minimum, user can also hide on timeframes that are not needed.
                 a_period = a_period + 1;
             } else if(a_period < 0) {
                 ErrorPrint("calculation error with \"a_period = ((period_adaptive_minutes * 60) / PeriodSeconds(PERIOD_CURRENT))\"");
@@ -160,7 +160,6 @@ int OnCalculate(const int rates_total,
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-    EventKillTimer();
     return;
 }
 //+------------------------------------------------------------------+
