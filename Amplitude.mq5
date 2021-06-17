@@ -20,9 +20,9 @@ You should have received a copy of the GNU General Public License along with thi
 //---- Main Properties
 #property copyright "2021, Mateus Matucuma Teixeira"
 #property link "https://github.com/BRMateus2/"
-#property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given iPeriod and can act as a substitute of the ATR indicator.\n"
+#property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given period and can act as a substitute of the ATR indicator.\n"
 #property description "The indicator can be used to observe volatility and the force of past swings, useful to determine excesses that will possibly be reversed or repeated, given that the user has knowledge to complement with volume or standard-deviation strategies.\n"
-#property description "It is suggested a iPeriod of 55200 at M1 or 2400 at H1 (meaning 40 sessions of 23hs each), or any iPeriod that complements your strategy."
+#property description "It is suggested a period of 55200 at M1 or 2400 at H1 (meaning 40 sessions of 23hs each), or any period that complements your strategy."
 #property version "1.04"
 #property strict
 #property indicator_separate_window
