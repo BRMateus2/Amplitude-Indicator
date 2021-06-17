@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License along with thi
 #property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given period and can act as a substitute of the ATR indicator.\n"
 #property description "The indicator can be used to observe volatility and the force of past swings, useful to determine excesses that will possibly be reversed or repeated, given that the user has knowledge to complement with volume or standard-deviation strategies.\n"
 #property description "It is suggested a period of 55200 at M1 or 2400 at H1 (meaning 40 sessions of 23hs each), or any period that complements your strategy."
-#property version "1.03"
+#property version "1.04"
 #property strict
 #property indicator_separate_window
 #property indicator_buffers 1
@@ -35,7 +35,7 @@ You should have received a copy of the GNU General Public License along with thi
 #property indicator_width1 1
 // Metatrader 5 has a limitation of 64 User Input Variable description, for reference this has 64 traces ----------------------------------------------------------------
 //---- Definitions
-#define ErrorPrint(D_error) Print("ERROR: " + D_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
+#define ErrorPrint(Dp_error) Print("ERROR: " + Dp_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
 //#define INPUT const
 #ifndef INPUT
 #define INPUT input
@@ -57,8 +57,10 @@ INPUT int period_ad_d1_inp = 40; // Period for D1 - Daily Timeframe
 INPUT int period_ad_w1_inp = 8; // Period for W1 - Weekly Timeframe
 INPUT int period_ad_mn1_inp = 2; // Period for MN - Monthly Timeframe
 //---- Indicator Indexes, Buffers and Handlers
-int buf_i = 0;
+const int buf_i = 0;
 double buf[];
+//---- PlotIndexSetString() Timer optimization, updates once per second
+datetime last = 0;
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function
 //+------------------------------------------------------------------+
@@ -177,7 +179,8 @@ int OnCalculate(const int rates_total,
         }
         buf[i] = show_percentage ? ((highest - lowest) * 100.0 / (MathAbs(highest + lowest) / 2.0)) : (highest - lowest);
     }
-    if(i == rates_total) {
+    if(i == rates_total && last < TimeCurrent()) {
+        last = TimeCurrent();
         if(show_percentage) {
             PlotIndexSetString(buf_i, PLOT_LABEL, "Relative Amplitude (" + DoubleToString(buf[i - 1], 2) + "%)");
         } else {
