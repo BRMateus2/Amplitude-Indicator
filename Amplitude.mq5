@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License along with thi
 #property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given period and can act as a substitute of the ATR indicator.\n"
 #property description "The indicator can be used to observe volatility and the force of past swings, useful to determine excesses that will possibly be reversed or repeated, given that the user has knowledge to complement with volume or standard-deviation strategies.\n"
 #property description "It is suggested a period of 55200 at M1 or 2400 at H1 (meaning 40 sessions of 23hs each), or any period that complements your strategy."
-#property version "1.02"
+#property version "1.03"
 #property strict
 #property indicator_separate_window
 #property indicator_buffers 1
@@ -35,27 +35,27 @@ You should have received a copy of the GNU General Public License along with thi
 #property indicator_width1 1
 // Metatrader 5 has a limitation of 64 User Input Variable description, for reference this has 64 traces ----------------------------------------------------------------
 //---- Definitions
-#define ErrorPrint(error) Print("ERROR: " + error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
-//#define _INPUT const
-#ifndef _INPUT
-#define _INPUT input
+#define ErrorPrint(D_error) Print("ERROR: " + D_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
+//#define INPUT const
+#ifndef INPUT
+#define INPUT input
 #endif
 //---- Indicator Definitions
 string short_name; // Defined at OnInit()
 //---- Input Parameters
 //---- "Basic Settings"
 input group "Basic Settings"
-_INPUT int period_inp = 2400; // Amplitude of last N candles
+INPUT int period_inp = 2400; // Amplitude of last N candles
 int period = 60; // Backup period if user inserts wrong value
-_INPUT bool ignore_gaps_inp = false; // Ignore gaps between candles? (Not include last close?)
-_INPUT bool show_percentage = true; // Show percentage instead of absolute values? (V*100 / (H+L)/2)
+INPUT bool ignore_gaps_inp = false; // Ignore gaps between candles? (Not include last close?)
+INPUT bool show_percentage = true; // Show percentage instead of absolute values? (V*100 / (H+L)/2)
 //---- "Adaptive Period"
 input group "Adaptive Period"
-_INPUT bool period_ad_inp = true; // Adapt the Period? Overrides Standard Period Settings
-_INPUT int period_ad_minutes_inp = 55200; // Period in minutes that all M and H timeframes should adapt to?
-_INPUT int period_ad_d1_inp = 40; // Period for D1 - Daily Timeframe
-_INPUT int period_ad_w1_inp = 8; // Period for W1 - Weekly Timeframe
-_INPUT int period_ad_mn1_inp = 2; // Period for MN - Monthly Timeframe
+INPUT bool period_ad_inp = true; // Adapt the Period? Overrides Standard Period Settings
+INPUT int period_ad_minutes_inp = 55200; // Period in minutes that all M and H timeframes should adapt to?
+INPUT int period_ad_d1_inp = 40; // Period for D1 - Daily Timeframe
+INPUT int period_ad_w1_inp = 8; // Period for W1 - Weekly Timeframe
+INPUT int period_ad_mn1_inp = 2; // Period for MN - Monthly Timeframe
 //---- Indicator Indexes, Buffers and Handlers
 int buf_i = 0;
 double buf[];
@@ -141,8 +141,8 @@ int OnCalculate(const int rates_total,
                 const long& volume[],
                 const int& spread[])
 {
-    if(rates_total < period) { // No need to calculate if the data is less than the requested period, rates_total is returned so the terminal knows that past candles are "done" (meaning skipped)
-        return rates_total;
+    if(rates_total < period) { // No need to calculate if the data is less than the requested period - it is returned as 0, because if we return rates_total, then the terminal interprets that the indicator has valid data
+        return 0;
     }
     /*
         Math Function:
@@ -181,10 +181,10 @@ int OnCalculate(const int rates_total,
         if(show_percentage) {
             PlotIndexSetString(buf_i, PLOT_LABEL, "Relative Amplitude (" + DoubleToString(buf[i - 1], 2) + "%)");
         } else {
-            PlotIndexSetString(buf_i, PLOT_LABEL, "Absolute Amplitude (" + DoubleToString(buf[i - 1], 2) + ")");
+            PlotIndexSetString(buf_i, PLOT_LABEL, "Absolute Amplitude (" + DoubleToString(buf[i - 1], Digits()) + ")");
         }
     }
-    return rates_total;
+    return rates_total; // Calculations are done and valid
 }
 //+------------------------------------------------------------------+
 // Deinitialization
