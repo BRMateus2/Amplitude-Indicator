@@ -11,7 +11,7 @@ You should have received a copy of the GNU General Public License along with thi
 #define AMPLITUDE_H
 //+------------------------------------------------------------------+
 //|                                                    Amplitude.mq5 |
-//|                         Copyright 2021, Mateus Matucuma Teixeira |
+//|                     Copyright (C) 2021, Mateus Matucuma Teixeira |
 //|                                            mateusmtoss@gmail.com |
 //| GNU General Public License version 2 - GPL-2.0                   |
 //| https://opensource.org/licenses/gpl-2.0.php                      |
@@ -19,36 +19,33 @@ You should have received a copy of the GNU General Public License along with thi
 // https://github.com/BRMateus2/Amplitude-Indicator/
 //---- Main Properties
 #property copyright "2021, Mateus Matucuma Teixeira"
-#property link "https://github.com/BRMateus2/"
+#property link "https://github.com/BRMateus2/Amplitude-Indicator/"
 #property description "This Indicator will show the Amplitude [Minimum; Maximum] of a given period and can act as a substitute of the ATR indicator.\n"
 #property description "The indicator can be used to observe volatility and the force of past swings, useful to determine excesses that will possibly be reversed or repeated, given that the user has knowledge to complement with volume or standard-deviation strategies.\n"
 #property description "It is suggested a period of 55200 at M1 or 2400 at H1 (meaning 40 sessions of 23hs each), or any period that complements your strategy."
-#property version "1.04"
+#property version "1.05"
 #property strict
 #property indicator_separate_window
 #property indicator_buffers 1
 #property indicator_plots 1
-#property indicator_label1 "Amplitude"
-#property indicator_type1 DRAW_LINE
-#property indicator_color1 clrTurquoise
-#property indicator_style1 STYLE_SOLID
-#property indicator_width1 1
-// Metatrader 5 has a limitation of 64 User Input Variable description, for reference this has 64 traces ----------------------------------------------------------------
 //---- Definitions
+#ifndef ErrorPrint
 #define ErrorPrint(Dp_error) Print("ERROR: " + Dp_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
+#endif
 //#define INPUT const
 #ifndef INPUT
 #define INPUT input
 #endif
-//---- Indicator Definitions
-string iName; // Defined at OnInit()
 //---- Input Parameters
 //---- "Basic Settings"
 input group "Basic Settings"
+string iName; // Defined at OnInit()
+const int iDigits = Digits(); // Subdigits on data
 INPUT int iPeriodInp = 2400; // Amplitude of last N candles
 int iPeriod = 60; // Backup iPeriod if user inserts wrong value
 INPUT bool iIgnoreGapsInp = false; // Ignore gaps between candles? (Not include last close?)
 INPUT bool iShowPercentageInp = true; // Show percentage instead of absolute values? (V*100 / (H+L)/2)
+const int iShift = 0; // Shift data
 //---- "Adaptive Period"
 input group "Adaptive Period"
 INPUT bool adPeriodInp = true; // Adapt the Period? Overrides Standard Period Settings
@@ -59,10 +56,22 @@ INPUT int adPeriodMN1Inp = 2; // Period for MN - Monthly Timeframe
 //---- Indicator Indexes, Buffers and Handlers
 const int iBufIndex = 0;
 double iBuf[];
+//---- Plot Definitions
+input group "Plot Definitions";
+// iBuf
+input group "Amplitude";
+const string iBufLabel = "Amplitude";
+INPUT color iBufColor = clrTurquoise; // Drawing Color
+const ENUM_DRAW_TYPE iBufDraw = DRAW_LINE; // Drawing Type
+INPUT ENUM_LINE_STYLE iBufStyle = STYLE_SOLID; // Drawing Style
+INPUT int iBufWidth = 1; // Drawing Width
 //---- PlotIndexSetString() Timer optimization, updates once per second
 datetime last = 0;
 //+------------------------------------------------------------------+
-//| Custom indicator initialization function
+//+------------------------------------------------------------------+
+// Constructor or initialization function
+// https://www.mql5.com/en/docs/basis/function/events
+// https://www.mql5.com/en/articles/100
 //+------------------------------------------------------------------+
 int OnInit()
 {
@@ -108,20 +117,22 @@ int OnInit()
         iPeriod = iPeriodInp;
     }
 // Treat Indicator
-    if(!IndicatorSetInteger(INDICATOR_DIGITS, Digits())) { // Indicator subdigit precision
-        ErrorPrint("IndicatorSetInteger(INDICATOR_DIGITS, Digits())");
-        return INIT_FAILED;
+    if(iShowPercentageInp) {
+        if(!IndicatorSetInteger(INDICATOR_DIGITS, 2)) { // Indicator subdigit precision
+            ErrorPrint("IndicatorSetInteger(INDICATOR_DIGITS, 2)");
+            return INIT_FAILED;
+        }
+    } else {
+        if(!IndicatorSetInteger(INDICATOR_DIGITS, iDigits)) { // Indicator subdigit precision
+            ErrorPrint("IndicatorSetInteger(INDICATOR_DIGITS, iDigits)");
+            return INIT_FAILED;
+        }
     }
-// Treat iBufIndex
-    if(!SetIndexBuffer(iBufIndex, iBuf, INDICATOR_DATA)) { // Indicator Data visible to user
-        ErrorPrint("SetIndexBuffer(iBufIndex, iBuf, INDICATOR_DATA)");
-        return INIT_FAILED;
-    };
-    if(!PlotIndexSetInteger(iBufIndex, PLOT_DRAW_BEGIN, iPeriod)) { // Will begin after the iPeriod is satisfied (data will be hidden if less than iPeriod)
-        ErrorPrint("PlotIndexSetInteger(iBufIndex, PLOT_DRAW_BEGIN, iPeriod)");
-        return INIT_FAILED;
+// Treat iBuf
+    if(!PlotIndexConstruct(iBufIndex, iBufLabel, iBufColor, iBuf, INDICATOR_DATA, iBufDraw, iShift, iBufStyle, iBufWidth, iPeriod)) {
+        ErrorPrint("");
     }
-// Subwindow Short Name
+// Indicator Subwindow Short Name
     iName = StringFormat("A(%d)", iPeriod); // Indicator name in Subwindow
     if(!IndicatorSetString(INDICATOR_SHORTNAME, iName)) { // Set Indicator name
         ErrorPrint("IndicatorSetString(INDICATOR_SHORTNAME, iName)");
@@ -130,7 +141,7 @@ int OnInit()
     return INIT_SUCCEEDED;
 }
 //+------------------------------------------------------------------+
-//| Amplitude Calculation
+// Calculation function
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total,
                 const int prev_calculated,
@@ -182,9 +193,13 @@ int OnCalculate(const int rates_total,
     if(i == rates_total && last < TimeCurrent()) {
         last = TimeCurrent();
         if(iShowPercentageInp) {
-            PlotIndexSetString(iBufIndex, PLOT_LABEL, "Relative Amplitude (" + DoubleToString(iBuf[i - 1], 2) + "%)");
+            if(!PlotIndexSetString(iBufIndex, PLOT_LABEL, "Relative Amplitude (" + DoubleToString(iBuf[i - 1], 2) + "%)")) {
+                ErrorPrint("!PlotIndexSetString(iBufIndex, PLOT_LABEL, \"Relative Amplitude (\" + DoubleToString(iBuf[i - 1], 2) + \"%)\")");
+            }
         } else {
-            PlotIndexSetString(iBufIndex, PLOT_LABEL, "Absolute Amplitude (" + DoubleToString(iBuf[i - 1], Digits()) + ")");
+            if(!PlotIndexSetString(iBufIndex, PLOT_LABEL, "Absolute Amplitude (" + DoubleToString(iBuf[i - 1], iDigits) + ")")) {
+                ErrorPrint("!PlotIndexSetString(iBufIndex, PLOT_LABEL, \"Absolute Amplitude (\" + DoubleToString(iBuf[i - 1], iDigits) + \")\")");
+            }
         }
     }
     return rates_total; // Calculations are done and valid
@@ -195,6 +210,164 @@ int OnCalculate(const int rates_total,
 void OnDeinit(const int reason)
 {
     return;
+}
+//+------------------------------------------------------------------+
+// Extra functions, utilities and conversion
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+// PlotIndexConstruct, substitute for common call
+// Fixed Issue: the function solves a issue with the platform #property, where every single time the .ex5 file is updated or recompiled, all of the Plot (color, etc) user settings are reset - this function is not made for Levels.
+//+------------------------------------------------------------------+
+bool PlotIndexConstruct(const int plotIndex,
+                        const string plotLabel,
+                        const color plotColor,
+                        double& plotBuffer[], // Cannot set this to const, because SetIndexBuffer() parameter is not const
+                        const ENUM_INDEXBUFFER_TYPE plotIndexType = INDICATOR_DATA,
+                        const ENUM_DRAW_TYPE plotDraw = DRAW_LINE,
+                        const int plotShift = 0,
+                        const ENUM_LINE_STYLE plotStyle = STYLE_SOLID,
+                        const int plotWidth = 1,
+                        const int plotBegin = 0,
+                        const bool plotShowOnDatawindow = true,
+                        const double plotEmptyValue = 0.0)
+{
+    bool success = true;
+    if(!SetIndexBuffer(plotIndex, plotBuffer, plotIndexType)) {
+        ErrorPrint("!SetIndexBuffer(plotIndex, plotBuffer, plotIndexType)");
+        success = false;
+    }
+    if(!PlotIndexSetString(plotIndex, PLOT_LABEL, plotLabel)) {
+        ErrorPrint("!PlotIndexSetString(plotIndex, PLOT_LABEL, plotLabel)");
+        success = false;
+    }
+    if(!PlotIndexSetInteger(plotIndex, PLOT_LINE_COLOR, plotColor)) {
+        ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_LINE_COLOR, plotColor)");
+        success = false;
+    }
+    if(plotDraw != DRAW_ARROW) {
+        if(!PlotIndexSetInteger(plotIndex, PLOT_DRAW_TYPE, plotDraw)) {
+            ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_DRAW_TYPE, plotDraw)");
+            success = false;
+        }
+        if(!PlotIndexSetInteger(plotIndex, PLOT_SHIFT, plotShift)) {
+            ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_SHIFT, plotShift)");
+            success = false;
+        }
+    } else {
+        if(!PlotIndexSetInteger(plotIndex, PLOT_DRAW_TYPE, plotDraw)) {
+            ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_DRAW_TYPE, plotDraw)");
+            success = false;
+        }
+        if(!PlotIndexSetInteger(plotIndex, PLOT_ARROW_SHIFT, plotShift)) {
+            ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_ARROW_SHIFT, plotShift)");
+            success = false;
+        }
+    }
+    if(!PlotIndexSetInteger(plotIndex, PLOT_LINE_STYLE, plotStyle)) {
+        ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_LINE_STYLE, plotStyle)");
+        success = false;
+    }
+    if(!PlotIndexSetInteger(plotIndex, PLOT_LINE_WIDTH, plotWidth)) {
+        ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_LINE_WIDTH, plotWidth)");
+        success = false;
+    }
+    if(!PlotIndexSetInteger(plotIndex, PLOT_DRAW_BEGIN, plotBegin)) {
+        ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_DRAW_BEGIN, plotBegin)");
+        success = false;
+    }
+    if(!PlotIndexSetInteger(plotIndex, PLOT_SHOW_DATA, plotShowOnDatawindow)) {
+        ErrorPrint("!PlotIndexSetInteger(plotIndex, PLOT_SHOW_DATA, plotShowOnDatawindow)");
+        success = false;
+    }
+    if(!PlotIndexSetDouble(plotIndex, PLOT_EMPTY_VALUE, plotEmptyValue)) {
+        ErrorPrint("!PlotIndexSetDouble(plotIndex, PLOT_EMPTY_VALUE, plotEmptyValue)");
+        success = false;
+    }
+    return success;
+}
+//+------------------------------------------------------------------+
+//| Creating Chart object
+//+------------------------------------------------------------------+
+bool ObjectChartCreate(const string symbol, // Symbol
+                       const long chart_ID = 0, // Chart ID
+                       const int sub_window = 0, // Subwindow Index
+                       const string name = "Chart", // Object Name
+                       const ENUM_TIMEFRAMES period = PERIOD_H1, // Period
+                       const long x = 0, // X Coordinate
+                       const long y = 0, // Y Coordinate
+                       const long width = 300, // Width
+                       const long height = 200, // Height
+                       const ENUM_BASE_CORNER corner = CORNER_LEFT_UPPER, // Anchoring Corner
+                       const long scale = 2, // Scale
+                       const bool date_scale = true, // Time Scale display
+                       const bool price_scale = true, // Price Scale display
+                       const color clr = clrRed, // Border color when highlighted
+                       const ENUM_LINE_STYLE style = STYLE_SOLID, // Line Style when highlighted
+                       const long point_width = 1, // Move Point size
+                       const bool back = false, // In the background
+                       const bool selection = false, // Highlight to move
+                       const bool hidden = true, // Hidden in the Object List
+                       const long z_order = 0) // Priority for mouse click
+{
+    if(!ObjectCreate(chart_ID, name, OBJ_CHART, sub_window, 0, 0)) {
+        ErrorPrint("!ObjectCreate(chart_ID, name, OBJ_CHART, sub_window, 0, 0)");
+        return false;
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_XDISTANCE, x)) { // Wont be returning false, because supposedly the ObjectCreate() was successful at this point
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_XDISTANCE, x)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_YDISTANCE, y)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_YDISTANCE, y)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_XSIZE, width)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_XSIZE, width)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_YSIZE, height)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_YSIZE, height)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_CORNER, corner)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_CORNER, corner)");
+    }
+    if(!ObjectSetString(chart_ID, name, OBJPROP_SYMBOL, symbol)) {
+        ErrorPrint("!ObjectSetString(chart_ID, name, OBJPROP_SYMBOL, symbol)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_PERIOD, period)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_PERIOD, period)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_CHART_SCALE, scale)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_CHART_SCALE, scale)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_DATE_SCALE, date_scale)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_DATE_SCALE, date_scale)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_PRICE_SCALE, price_scale)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_PRICE_SCALE, price_scale)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_COLOR, clr)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_COLOR, clr)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_STYLE, style)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_STYLE, style)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_WIDTH, point_width)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_WIDTH, point_width)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_BACK, back)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_BACK, back)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_SELECTABLE, selection)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_SELECTABLE, selection)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_SELECTED, selection)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_SELECTED, selection)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_HIDDEN, hidden)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_HIDDEN, hidden)");
+    }
+    if(!ObjectSetInteger(chart_ID, name, OBJPROP_ZORDER, z_order)) {
+        ErrorPrint("!ObjectSetInteger(chart_ID, name, OBJPROP_ZORDER, z_order)");
+    }
+    return true;
 }
 //+------------------------------------------------------------------+
 //| Header Guard #endif
